@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Tv, Cpu, Eye, Compass, Trophy, User, Calendar, Clock, 
   Users, CheckCircle, ChevronRight, ChevronLeft, CreditCard, 
-  Download, Printer, Plus, Minus, ArrowRight 
+  Download, Printer, Plus, Minus, ArrowRight, Gamepad2
 } from 'lucide-react';
 
 const BookingStepper = ({ zones, selectedZoneId, onBookingComplete, addToast }) => {
@@ -17,10 +17,14 @@ const BookingStepper = ({ zones, selectedZoneId, onBookingComplete, addToast }) 
     name: '',
     email: '',
     phone: '',
+    paymentMethod: 'lounge',
   });
 
   const [bookingConfirmedData, setBookingConfirmedData] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [cardDetails, setCardDetails] = useState({ number: '', expiry: '', cvv: '', name: '' });
+  const [cardErrors, setCardErrors] = useState({});
+  const [upiPaid, setUpiPaid] = useState(false);
 
   // Available addons
   const addonsList = [
@@ -151,6 +155,39 @@ const BookingStepper = ({ zones, selectedZoneId, onBookingComplete, addToast }) 
       return;
     }
 
+    // Payment validation
+    if (bookingData.paymentMethod === 'card') {
+      const errors = {};
+      if (cardDetails.number.replace(/\s/g, '').length !== 16) {
+        errors.number = 'Card number must be 16 digits.';
+      }
+      if (!cardDetails.expiry.match(/^\d{2}\/\d{2}$/)) {
+        errors.expiry = 'Expiry must be MM/YY.';
+      } else {
+        const [month] = cardDetails.expiry.split('/').map(Number);
+        if (month < 1 || month > 12) {
+          errors.expiry = 'Invalid month.';
+        }
+      }
+      if (cardDetails.cvv.length !== 3) {
+        errors.cvv = 'CVV must be 3 digits.';
+      }
+      if (!cardDetails.name.trim()) {
+        errors.name = 'Cardholder name is required.';
+      }
+
+      if (Object.keys(errors).length > 0) {
+        setCardErrors(errors);
+        addToast('Payment Error', 'Please check card details.', 'error');
+        return;
+      }
+    }
+
+    if (bookingData.paymentMethod === 'upi' && !upiPaid) {
+      addToast('Payment Pending', 'Please scan the QR Code or simulate payment success to complete booking.', 'error');
+      return;
+    }
+
     setIsSubmitting(true);
     
     // Simulate booking submission
@@ -171,7 +208,8 @@ const BookingStepper = ({ zones, selectedZoneId, onBookingComplete, addToast }) 
       setIsSubmitting(false);
       setCurrentStep(5);
       addToast('Success!', 'Your gaming session is locked and loaded!', 'success');
-    }, 2000);
+      setUpiPaid(false); // Reset payment status
+    }, 2500);
   };
 
   const handlePrint = () => {
@@ -532,13 +570,211 @@ const BookingStepper = ({ zones, selectedZoneId, onBookingComplete, addToast }) 
                   />
                 </div>
 
-                <div className="glass" style={{ borderRadius: 'var(--border-radius-md)', padding: '1.25rem', display: 'flex', gap: '1rem', alignItems: 'center', border: '1px solid rgba(0, 242, 254, 0.15)' }}>
-                  <CreditCard className="text-glow-cyan" style={{ color: 'var(--accent-cyan)' }} />
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
-                    <strong style={{ color: '#fff' }}>Instant Reservation Booking</strong><br />
-                    No prepayment required today. Card holds slot. Pay at the esports lounge desk.
+                {/* Payment Selector */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  <label className="booking-label" style={{ fontSize: '0.75rem' }}>Choose Payment Channel</label>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1rem' }}>
+                    {[
+                      { id: 'lounge', label: 'Pay at Lounge', desc: 'Reserve & pay later' },
+                      { id: 'card', label: 'Credit Card', desc: 'Secure online card' },
+                      { id: 'upi', label: 'UPI QR Code', desc: 'Scan & pay instantly' }
+                    ].map(method => (
+                      <div 
+                        key={method.id}
+                        className={`addon-card glass ${bookingData.paymentMethod === method.id ? 'selected' : ''}`}
+                        style={{ padding: '0.75rem', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center', cursor: 'pointer', borderRadius: 'var(--border-radius-sm)', transition: 'var(--transition-fast)' }}
+                        onClick={() => {
+                          setBookingData(prev => ({ ...prev, paymentMethod: method.id }));
+                          setCardErrors({});
+                        }}
+                      >
+                        <span style={{ fontSize: '0.85rem', fontWeight: 'bold', color: '#fff' }}>{method.label}</span>
+                        <span style={{ fontSize: '0.65rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>{method.desc}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
+
+                {/* Conditional Payment Rendering */}
+                {bookingData.paymentMethod === 'lounge' && (
+                  <div className="glass animate-fade-in" style={{ borderRadius: 'var(--border-radius-md)', padding: '1.25rem', display: 'flex', gap: '1rem', alignItems: 'center', border: '1px solid rgba(121, 40, 202, 0.15)', marginTop: '0.5rem' }}>
+                    <CreditCard className="text-glow-purple" style={{ color: 'var(--accent-purple)' }} />
+                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', lineHeight: '1.4' }}>
+                      <strong style={{ color: '#fff' }}>Reservation Hold</strong><br />
+                      No pre-payment required online. Pay at the lounge desk via cash, card, or UPI when checking in.
+                    </div>
+                  </div>
+                )}
+
+                {bookingData.paymentMethod === 'card' && (
+                  <div className="animate-scale-up" style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '0.5rem' }}>
+                    {/* Live Virtual Card Preview */}
+                    <div className="glass receipt-pulse" style={{
+                      borderRadius: 'var(--border-radius-md)',
+                      background: 'linear-gradient(135deg, rgba(121, 40, 202, 0.35), rgba(0, 242, 254, 0.35))',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      padding: '1.25rem',
+                      height: '150px',
+                      position: 'relative',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      justifyContent: 'space-between',
+                      boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <span style={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.7)', fontWeight: 'bold', letterSpacing: '1px' }}>NEXUS SECURE GATEWAY</span>
+                        <Gamepad2 size={20} className="text-glow-cyan" style={{ color: 'var(--accent-cyan)' }} />
+                      </div>
+                      <div style={{ fontFamily: 'monospace', fontSize: '1.2rem', letterSpacing: '2px', color: '#fff', textAlign: 'center', margin: '0.5rem 0' }}>
+                        {cardDetails.number || '•••• •••• •••• ••••'}
+                      </div>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                        <div>
+                          <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>Card Holder</div>
+                          <div style={{ fontSize: '0.75rem', color: '#fff', fontWeight: 600, maxWidth: '160px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                            {cardDetails.name || bookingData.name || 'GAMER NAME'}
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', gap: '1rem' }}>
+                          <div>
+                            <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>Expires</div>
+                            <div style={{ fontSize: '0.75rem', color: '#fff', fontFamily: 'monospace' }}>{cardDetails.expiry || 'MM/YY'}</div>
+                          </div>
+                          <div>
+                            <div style={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>CVV</div>
+                            <div style={{ fontSize: '0.75rem', color: '#fff', fontFamily: 'monospace' }}>{cardDetails.cvv ? '•••' : '000'}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Card inputs */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <span className="booking-label" style={{ fontSize: '0.7rem' }}>Cardholder Name</span>
+                        <input 
+                          type="text" 
+                          placeholder="Name on card"
+                          className="datepicker-input" 
+                          style={{ padding: '0.65rem 0.85rem', fontSize: '0.9rem' }}
+                          value={cardDetails.name}
+                          onChange={(e) => setCardDetails(prev => ({ ...prev, name: e.target.value.substring(0, 30) }))}
+                        />
+                        {cardErrors.name && <span style={{ fontSize: '0.75rem', color: 'var(--accent-red)' }}>{cardErrors.name}</span>}
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                        <span className="booking-label" style={{ fontSize: '0.7rem' }}>Card Number</span>
+                        <input 
+                          type="text" 
+                          placeholder="4111 2222 3333 4444"
+                          className="datepicker-input" 
+                          style={{ padding: '0.65rem 0.85rem', fontSize: '0.9rem', fontFamily: 'monospace' }}
+                          value={cardDetails.number}
+                          onChange={(e) => {
+                            let val = e.target.value.replace(/\D/g, '').substring(0, 16);
+                            let formatted = val.replace(/(\d{4})/g, '$1 ').trim();
+                            setCardDetails(prev => ({ ...prev, number: formatted }));
+                          }}
+                        />
+                        {cardErrors.number && <span style={{ fontSize: '0.75rem', color: 'var(--accent-red)' }}>{cardErrors.number}</span>}
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          <span className="booking-label" style={{ fontSize: '0.7rem' }}>Expiry Date</span>
+                          <input 
+                            type="text" 
+                            placeholder="MM/YY"
+                            className="datepicker-input" 
+                            style={{ padding: '0.65rem 0.85rem', fontSize: '0.9rem', fontFamily: 'monospace' }}
+                            value={cardDetails.expiry}
+                            onChange={(e) => {
+                              let val = e.target.value.replace(/\D/g, '').substring(0, 4);
+                              if (val.length > 2) {
+                                val = `${val.substring(0, 2)}/${val.substring(2, 4)}`;
+                              }
+                              setCardDetails(prev => ({ ...prev, expiry: val }));
+                            }}
+                          />
+                          {cardErrors.expiry && <span style={{ fontSize: '0.75rem', color: 'var(--accent-red)' }}>{cardErrors.expiry}</span>}
+                        </div>
+
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                          <span className="booking-label" style={{ fontSize: '0.7rem' }}>CVV</span>
+                          <input 
+                            type="password" 
+                            placeholder="123"
+                            className="datepicker-input" 
+                            style={{ padding: '0.65rem 0.85rem', fontSize: '0.9rem', fontFamily: 'monospace' }}
+                            value={cardDetails.cvv}
+                            onChange={(e) => {
+                              let val = e.target.value.replace(/\D/g, '').substring(0, 3);
+                              setCardDetails(prev => ({ ...prev, cvv: val }));
+                            }}
+                          />
+                          {cardErrors.cvv && <span style={{ fontSize: '0.75rem', color: 'var(--accent-red)' }}>{cardErrors.cvv}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {bookingData.paymentMethod === 'upi' && (
+                  <div className="glass animate-scale-up" style={{ borderRadius: 'var(--border-radius-md)', padding: '1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem', border: '1px solid rgba(0, 242, 254, 0.15)', marginTop: '0.5rem' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: 'var(--accent-cyan)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                      Scan & Pay with UPI
+                    </span>
+                    
+                    <div style={{ 
+                      width: '130px', 
+                      height: '130px', 
+                      background: '#fff', 
+                      padding: '0.5rem', 
+                      borderRadius: '8px', 
+                      display: 'flex', 
+                      alignItems: 'center', 
+                      justifyContent: 'center', 
+                      position: 'relative',
+                      boxShadow: '0 4px 20px rgba(0,242,254,0.15)'
+                    }}>
+                      <img 
+                        src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa=nexusdome@upi%26pn=Nexus%20Dome%26am=1443%26cu=INR" 
+                        alt="UPI QR Code scanner" 
+                        style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                      />
+                      {upiPaid && (
+                        <div style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(4,4,7,0.9)', borderRadius: '8px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+                          <CheckCircle size={32} style={{ color: 'var(--accent-neon-green)' }} />
+                          <span style={{ fontSize: '0.7rem', color: 'var(--accent-neon-green)', fontWeight: 'bold', textTransform: 'uppercase' }}>Scan Success</span>
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: '1rem', fontWeight: 800, color: '#fff' }}>₹{grandTotal}.00</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>VPA: <strong style={{ color: '#fff' }}>nexusdome@upi</strong></div>
+                    </div>
+
+                    {!upiPaid ? (
+                      <button 
+                        type="button" 
+                        className="btn-secondary" 
+                        style={{ padding: '0.5rem 1rem', fontSize: '0.75rem', width: 'auto' }}
+                        onClick={() => {
+                          setUpiPaid(true);
+                          addToast('UPI Scan Complete', 'Simulated UPI transfer authorized.', 'success');
+                        }}
+                      >
+                        Simulate UPI Scan Success
+                      </button>
+                    ) : (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--accent-neon-green)', fontWeight: 600 }}>
+                        ✓ Payment confirmed. Ready to lock session coordinates.
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
               
               <div>
@@ -618,6 +854,12 @@ const BookingStepper = ({ zones, selectedZoneId, onBookingComplete, addToast }) 
                   <span className="receipt-label" style={{ color: '#fff', fontWeight: 700 }}>Total Charge</span>
                   <span className="receipt-val" style={{ color: 'var(--accent-cyan)', fontWeight: 800 }}>
                     ₹{bookingConfirmedData.totalPrice}.00
+                  </span>
+                </div>
+                <div className="receipt-row" style={{ fontSize: '0.9rem', marginTop: '0.5rem' }}>
+                  <span className="receipt-label">Payment Channel</span>
+                  <span className="receipt-val" style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}>
+                    {bookingConfirmedData.paymentMethod === 'lounge' ? 'Pay at Lounge (Pending)' : bookingConfirmedData.paymentMethod === 'card' ? 'Credit Card (Paid)' : 'UPI Scan (Paid)'}
                   </span>
                 </div>
               </div>
@@ -768,12 +1010,21 @@ const BookingSummarySidebar = ({ selectedZone, bookingData, baseTotal, addonsTot
         </div>
       )}
 
-      <div style={{ marginTop: '1.5rem', borderTop: '1px solid var(--glass-border)', paddingTop: '1rem' }}>
-        <div className="summary-row" style={{ marginBottom: 0 }}>
-          <span className="summary-label" style={{ color: '#fff', fontWeight: 700 }}>Grand Total</span>
-          <span className="summary-val total">₹{grandTotal}.00</span>
+        {bookingData.paymentMethod && (
+          <div className="summary-row" style={{ marginTop: '0.75rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '0.75rem' }}>
+            <span className="summary-label">Payment Mode</span>
+            <span className="summary-val" style={{ textTransform: 'capitalize', color: 'var(--accent-cyan)' }}>
+              {bookingData.paymentMethod === 'lounge' ? 'Pay at Lounge' : bookingData.paymentMethod === 'card' ? 'Credit Card' : 'UPI QR Code'}
+            </span>
+          </div>
+        )}
+
+        <div style={{ marginTop: '1rem', borderTop: '1px solid var(--glass-border)', paddingTop: '1rem' }}>
+          <div className="summary-row" style={{ marginBottom: 0 }}>
+            <span className="summary-label" style={{ color: '#fff', fontWeight: 700 }}>Grand Total</span>
+            <span className="summary-val total">₹{grandTotal}.00</span>
+          </div>
         </div>
-      </div>
     </div>
   );
 };

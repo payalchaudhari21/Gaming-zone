@@ -259,6 +259,7 @@ const AdminDashboard = ({ bookings, onUpdateBookingStatus, onDeleteBooking, addT
                   <th>Date & Time</th>
                   <th>Players</th>
                   <th>Bill Total</th>
+                  <th>Payment</th>
                   <th>Status</th>
                   <th>Actions</th>
                 </tr>
@@ -280,6 +281,11 @@ const AdminDashboard = ({ bookings, onUpdateBookingStatus, onDeleteBooking, addT
                     </td>
                     <td>{b.players}</td>
                     <td style={{ fontWeight: 700, color: '#fff' }}>₹{b.totalPrice}.00</td>
+                    <td>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                        {b.paymentMethod === 'card' ? '💳 Card' : b.paymentMethod === 'upi' ? '📱 UPI' : '🏨 Lounge'}
+                      </span>
+                    </td>
                     <td>
                       <span className={`badge ${b.status}`}>{b.status}</span>
                     </td>

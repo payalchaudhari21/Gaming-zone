@@ -175,6 +175,7 @@ function App() {
         phone: '+1 (555) 101-3829',
         totalPrice: 1443,
         status: 'confirmed',
+        paymentMethod: 'card',
         createdAt: new Date(Date.now() - 3600000 * 2).toISOString()
       },
       {
@@ -191,6 +192,7 @@ function App() {
         phone: '+1 (555) 800-1991',
         totalPrice: 997,
         status: 'confirmed',
+        paymentMethod: 'upi',
         createdAt: new Date(Date.now() - 3600000 * 5).toISOString()
       },
       {
@@ -207,6 +209,7 @@ function App() {
         phone: '+44 7911 123456',
         totalPrice: 499,
         status: 'confirmed',
+        paymentMethod: 'lounge',
         createdAt: new Date(Date.now() - 3600000 * 24).toISOString()
       },
       {
@@ -223,6 +226,7 @@ function App() {
         phone: '+1 (555) 000-0000',
         totalPrice: 6245,
         status: 'completed',
+        paymentMethod: 'card',
         createdAt: new Date(Date.now() - 3600000 * 48).toISOString()
       }
     ];
